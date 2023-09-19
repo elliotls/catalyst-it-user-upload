@@ -3,7 +3,7 @@
 
 function readInputFile() {
     $cmdOptions = ["file:","dry_run:"];
-    $cmdValues = getopt('file:u:p:h:', $cmdOptions);
+    $cmdValues = getopt('file:u:p:h:dry_run:', $cmdOptions);
 
     // Validate file format
     if (!isset($cmdValues['file']) || !str_ends_with($cmdValues['file'], ".csv")) {
@@ -20,7 +20,9 @@ function readInputFile() {
         exit;
     }
 
-    return [$cmdValues, $csv];
+    // $insertUsers = isset();
+    // echo "DRY RUN VAL: {$cmdValues['dry_run']}\n";
+    return [$cmdValues, $csv, $cmdValues['dry_run']];
 }
 
 function validateDatabaseCreds($cmdValues) {
@@ -70,8 +72,8 @@ function insertUsers($csvRows, $host, $user, $password) {
     $queuedEmailAddresses = [];
     $databaseConnection = new mysqli($host, $user, $password, 'user_upload');
     foreach ($csvRows as $userData) {
-        $userData[0] = str_replace('\'', '\\\'', $userData[0]);
-        $userData[1] = str_replace('\'', '\\\'', $userData[1]);
+        $firstName = formatName($userData[0]);
+        $lastName = formatName($userData[1]);
         $emailAddress = trim(str_replace('\'', '\'\'', $userData[2]));
         // Validate and queue email address
         if (!validateEmailAddress($emailAddress)) {
@@ -79,7 +81,7 @@ function insertUsers($csvRows, $host, $user, $password) {
         } elseif (in_array($emailAddress, $queuedEmailAddresses)) {
             echo "Email address '$emailAddress' is not unique and will be ignored.\n";
         } else {
-            $queryArray[] = "('$userData[0]', '$userData[1]', '$emailAddress')";
+            $queryArray[] = "('$firstName', '$lastName', '$emailAddress')";
             $queuedEmailAddresses[] = $emailAddress;
         }
     }
@@ -97,14 +99,19 @@ function validateEmailAddress($email) {
     return filter_var($email, FILTER_VALIDATE_EMAIL);
 }
 
+function formatName($name) {
+    return ucfirst(strtolower(trim(str_replace('\'', '\\\'', $name))));
+}
+
 echo "~~ Initialising user upload ~~ \n";
-[$cmdValues, $csvRows] = readInputFile();
-echo "CSV Rows: {$csvRows[0][0]}, {$csvRows[0][1]}, {$csvRows[0][2]}\n";
+
+[$cmdValues, $csvRows, $isDryRun] = readInputFile();
 
 validateDatabaseCreds($cmdValues);
 
 initialiseDatabase($cmdValues['u'], $cmdValues['p'], $cmdValues['h']);
 
-insertUsers($csvRows, $cmdValues['h'], $cmdValues['u'], $cmdValues['p']);
-
+if (!$isDryRun) insertUsers($csvRows, $cmdValues['h'], $cmdValues['u'], $cmdValues['p']);
+echo "\n";
+exit;
 ?>

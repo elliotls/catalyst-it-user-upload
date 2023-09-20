@@ -3,16 +3,17 @@
 
 function readInputFile() {
     $cmdOptions = ["file:","dry_run:"];
-    $cmdValues = getopt('file:u:p:h:dry_run:', $cmdOptions);
+    $cmdValues = getopt('file:u:p:h:', $cmdOptions);
 
-    // Validate file format
+    // Validate file type
     if (!isset($cmdValues['file']) || !str_ends_with($cmdValues['file'], ".csv")) {
         echo "Please provide a csv file with the --file option\n";
         exit;
     } else {
         echo "Filename: {$cmdValues['file']}\n";
     }
-
+    
+    // Validate file format
     $csv = array_map("str_getcsv", file($cmdValues['file'], FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES));
     $header = array_shift($csv);
     if ($header[0] != "name" || $header[1] != "surname" || trim($header[2]) != "email") {
@@ -20,14 +21,11 @@ function readInputFile() {
         exit;
     }
 
-    // $insertUsers = isset();
-    // echo "DRY RUN VAL: {$cmdValues['dry_run']}\n";
-    return [$cmdValues, $csv, $cmdValues['dry_run']];
+    return [$cmdValues, $csv, isset($cmdValues['dry_run'])];
 }
 
 function validateDatabaseCreds($cmdValues) {
     $credentials = ['u' => 'username', 'p' => 'password', 'h' => 'host'];
-    // $credentials = ['u' => 'username', 'h' => 'host'];
     foreach ($credentials as $credential => $description) {
         if (!isset($cmdValues[$credential])) {
             echo "Database credential {$description} not found. Please try again\n";
@@ -48,6 +46,7 @@ function initialiseDatabase($user, $password, $host) {
         die("Connection failed: " . $databaseConnection->connect_error);
     }
 
+    // Create DB instance and table
     $sql = "DROP DATABASE IF EXISTS user_upload;
             CREATE DATABASE user_upload;
             CREATE TABLE user_upload.users (
@@ -71,6 +70,7 @@ function insertUsers($csvRows, $host, $user, $password) {
     $queryArray = [];
     $queuedEmailAddresses = [];
     $databaseConnection = new mysqli($host, $user, $password, 'user_upload');
+    // Build query as array checking user data while iterating over the csv lines
     foreach ($csvRows as $userData) {
         $firstName = formatName($userData[0]);
         $lastName = formatName($userData[1]);
@@ -86,7 +86,6 @@ function insertUsers($csvRows, $host, $user, $password) {
         }
     }
     
-    // echo "INSERT INTO users (name, surname, email) VALUES ".implode(",",$queryArray)."\n";
     $result = $databaseConnection->query("INSERT INTO users (name, surname, email) VALUES ".implode(",",$queryArray));
     if (!$result) {
         die('Invalid query');
@@ -104,13 +103,9 @@ function formatName($name) {
 }
 
 echo "~~ Initialising user upload ~~ \n";
-
 [$cmdValues, $csvRows, $isDryRun] = readInputFile();
-
 validateDatabaseCreds($cmdValues);
-
 initialiseDatabase($cmdValues['u'], $cmdValues['p'], $cmdValues['h']);
-
 if (!$isDryRun) insertUsers($csvRows, $cmdValues['h'], $cmdValues['u'], $cmdValues['p']);
 echo "\n";
 exit;

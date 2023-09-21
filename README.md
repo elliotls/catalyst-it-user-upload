@@ -1,4 +1,4 @@
-# Catalyst IT Developer Exercise
+# User Upload Script Exercise
 Submission by Elliot Lines Smith
 
 Prerequisites for the `user_upload` command:
